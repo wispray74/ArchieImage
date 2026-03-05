@@ -41,11 +41,25 @@ app.use('/admin', require('./routes/admin'));
 app.get('/health', (req, res) => res.json({ status: 'ok', app: 'Archie Image' }));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, '../web/login.html')));
 
-app.listen(PORT, async () => {
-  console.log(`Archie Image running on port ${PORT}`);
-  try {
-    await migrate();
+async function start() {
+  let retries = 5;
+  while (retries > 0) {
+    try {
+      await migrate();
+      break;
+    } catch (err) {
+      retries--;
+      console.error(`[Startup] Migrate gagal, sisa ${retries} retries:`, err.message || err);
+      if (retries === 0) break;
+      await new Promise(r => setTimeout(r, 3000));
+    }
+  }
+
+  app.listen(PORT, () => {
+    console.log(`Archie Image running on port ${PORT}`);
     const { startQueue } = require('./queue/processor');
     startQueue();
-  } catch (err) { console.error('Startup error:', err.message); }
-});
+  });
+}
+
+start();
