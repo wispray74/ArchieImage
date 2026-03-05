@@ -15,7 +15,7 @@ function maybeDecompress(buffer) {
   if (buffer[0] === 0x1F && buffer[1] === 0x8B) {
     try { return zlib.gunzipSync(buffer); } catch {}
   }
-  if (buffer[0] === 0x78 && (buffer[1] === 0x9C || buffer[1] === 0xDA || buffer[1] === 0x01)) {
+  if (buffer[0] === 0x78) {
     try { return zlib.inflateSync(buffer); } catch {}
   }
   return buffer;
@@ -26,21 +26,20 @@ async function fetchRaw(assetId, apiKey) {
     `https://apis.roblox.com/asset-delivery-api/v1/assetId/${assetId}`,
     { headers: { 'x-api-key': apiKey, 'Accept': 'application/json' }, redirect: 'follow' }
   );
-
   if (step1.status === 401) throw new Error('API key tidak valid atau kadaluarsa');
-  if (step1.status === 403) throw new Error('API key tidak punya permission "Legacy APIs" (legacy-asset:manage)');
+  if (step1.status === 403) throw new Error('API key tidak punya permission Legacy APIs (legacy-asset:manage)');
   if (step1.status === 404) throw new Error('Asset tidak ditemukan');
   if (!step1.ok) throw new Error(`Step1 HTTP ${step1.status}`);
 
   const meta   = await step1.json();
-  const cdnUrl = meta?.location;
+  const cdnUrl = meta && meta.location;
   if (!cdnUrl) throw new Error('CDN URL tidak ada: ' + JSON.stringify(meta));
 
   const step2 = await fetch(cdnUrl, {
     headers: { 'User-Agent': 'Roblox/WinInet', 'Accept': '*/*', 'Accept-Encoding': 'identity' },
     redirect: 'follow'
   });
-  if (!step2.ok) throw new Error(`Step2 CDN HTTP ${step2.status}`);
+  if (!step2.ok) throw new Error('Step2 CDN HTTP ' + step2.status);
 
   const raw = Buffer.from(await step2.arrayBuffer());
   return maybeDecompress(raw);
@@ -49,31 +48,31 @@ async function fetchRaw(assetId, apiKey) {
 function parseTextureId(buffer) {
   const text = buffer.toString('utf8');
 
-  // <uri>rbxassetid://ID</uri>  — Open Cloud / format baru
-  let m = text.match(/<uri>\s*rbxassetid:\/\/(\d+)\s*<\/uri>/i);
+  // Format 1: rbxassetid://12345
+  let m = text.match(/rbxassetid:\/\/(\d+)/i);
   if (m) return m[1];
 
-  // <url>rbxassetid://ID</url>  — format lama
-  m = text.match(/<url>\s*rbxassetid:\/\/(\d+)\s*<\/url>/i);
+  // Format 2: http://www.roblox.com/asset/?id=12345
+  m = text.match(/roblox\.com\/asset\/\?id=(\d+)/i);
   if (m) return m[1];
 
-  // name="Texture" ... rbxassetid://ID
-  m = text.match(/name=["']Texture["'][\s\S]{0,400}?rbxassetid:\/\/(\d+)/i);
+  // Format 3: <url> atau <uri> berisi angka saja
+  m = text.match(/<(?:url|uri)>\s*(\d{6,})\s*<\/(?:url|uri)>/i);
   if (m) return m[1];
 
-  // Semua rbxassetid di dokumen
-  const all = [...text.matchAll(/rbxassetid:\/\/(\d+)/gi)].map(x => x[1]);
-  if (all.length) return all[0];
+  // Format 4: angka 10+ digit (asset ID modern) di mana saja
+  const big = text.match(/\b(\d{10,})\b/);
+  if (big) return big[1];
 
   return null;
 }
 
-// ── GET /user/convert/debug/:assetId ─────────────────────────
+// ── GET /user/convert/debug/:assetId ────────────────────────
 router.get('/debug/:assetId', requireAuth, async (req, res) => {
   try {
-    const { assetId } = req.params;
-    const { account_id } = req.query;
-    if (!account_id) return res.status(400).json({ error: 'Tambah ?account_id=ID_AKUN_ROBLOX' });
+    const assetId    = req.params.assetId;
+    const account_id = req.query.account_id;
+    if (!account_id) return res.status(400).json({ error: 'Tambah ?account_id=ID_AKUN' });
 
     const acc = await db.query(
       'SELECT api_key_encrypted FROM roblox_accounts WHERE id=$1 AND user_id=$2',
@@ -84,26 +83,20 @@ router.get('/debug/:assetId', requireAuth, async (req, res) => {
     const apiKey = decrypt(acc.rows[0].api_key_encrypted).trim();
     const buffer = await fetchRaw(assetId, apiKey);
     const text   = buffer.toString('utf8');
-    const hex16  = buffer.slice(0, 16).toString('hex');
-    const parsed = parseTextureId(buffer);
 
     res.json({
-      asset_id:         assetId,
-      size_bytes:       buffer.length,
-      first_16_hex:     hex16,
-      is_xml:           text.trimStart().startsWith('<'),
-      is_binary:        buffer[0] === 0x3C && buffer[1] === 0x72, // <r = roblox binary
-      parsed_image_id:  parsed,
-      first_800_text:   text.slice(0, 800),
-      all_rbxassetids:  [...text.matchAll(/rbxassetid:\/\/(\d+)/gi)].map(m => m[1]),
-      all_numbers_8plus:[...text.matchAll(/\b(\d{8,})\b/g)].map(m => m[1]).slice(0, 10),
+      asset_id:        assetId,
+      size_bytes:      buffer.length,
+      first_16_hex:    buffer.slice(0, 16).toString('hex'),
+      parsed_image_id: parseTextureId(buffer),
+      full_text:       text,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ── POST /user/convert/decal-to-image ────────────────────────
+// ── POST /user/convert/decal-to-image ───────────────────────
 router.post('/decal-to-image', requireAuth, async (req, res) => {
   try {
     const { items, roblox_account_id } = req.body;
@@ -113,7 +106,7 @@ router.post('/decal-to-image', requireAuth, async (req, res) => {
     if (!Array.isArray(items) || !items.length)
       return res.status(400).json({ error: 'items wajib berupa array' });
     if (items.length > MAX_BATCH)
-      return res.status(400).json({ error: `Maksimal ${MAX_BATCH} item` });
+      return res.status(400).json({ error: 'Maksimal ' + MAX_BATCH + ' item' });
 
     const acc = await db.query(
       'SELECT api_key_encrypted FROM roblox_accounts WHERE id=$1 AND user_id=$2',
@@ -139,22 +132,22 @@ router.post('/decal-to-image', requireAuth, async (req, res) => {
         const text    = buffer.toString('utf8');
         const head    = text.slice(0, 80).toLowerCase().trimStart();
 
-        // Cek error response
         if (head.startsWith('<!') || head.startsWith('<html'))
           throw new Error('Dapat HTML error — API key mungkin tidak valid');
         if (head.startsWith('{')) {
-          const j = JSON.parse(text);
-          throw new Error(j?.errors?.[0]?.message || 'Roblox API error');
+          try {
+            const j = JSON.parse(text);
+            throw new Error((j.errors && j.errors[0] && j.errors[0].message) || 'Roblox API error');
+          } catch(e) { throw e; }
         }
 
         const imageId = parseTextureId(buffer);
 
         if (!imageId) {
-          // Log raw untuk debugging
-          console.error(`[Convert] Parse gagal untuk ${decalId}. Size: ${buffer.length}. Head: ${text.slice(0, 200)}`);
-          results.push({ decal_id: decalId, name, image_id: null, error: 'TextureId tidak ditemukan. Cek log Railway.' });
+          console.error('[Convert] Parse gagal', decalId, '| size:', buffer.length, '| head:', text.slice(0, 300));
+          results.push({ decal_id: decalId, name, image_id: null, error: 'TextureId tidak ditemukan. Cek Railway logs.' });
         } else {
-          console.log(`[Convert] ${decalId} → Image ID: ${imageId}`);
+          console.log('[Convert]', decalId, '->', imageId);
           results.push({ decal_id: decalId, name, image_id: imageId, error: null });
         }
       } catch (err) {
@@ -164,8 +157,8 @@ router.post('/decal-to-image', requireAuth, async (req, res) => {
       await sleep(DELAY_MS);
     }
 
-    const ok   = results.filter(r => r.image_id);
-    const fail = results.filter(r => !r.image_id);
+    const ok   = results.filter(function(r) { return r.image_id; });
+    const fail = results.filter(function(r) { return !r.image_id; });
     res.json({ results, ok_count: ok.length, fail_count: fail.length });
 
   } catch (err) {
