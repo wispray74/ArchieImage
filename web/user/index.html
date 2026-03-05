@@ -84,6 +84,7 @@
       <li><a href="#" class="active" data-page="upload"><span class="icon">🖼️</span><span>Upload</span></a></li>
       <li><a href="#" data-page="export"><span class="icon">📋</span><span>Export Lua</span></a></li>
       <li><a href="#" data-page="jobs"><span class="icon">⏳</span><span>Jobs</span></a></li>
+      <li><a href="#" data-page="convert"><span class="icon">🔄</span><span>Decal → Image</span></a></li>
       <li><a href="#" data-page="accounts"><span class="icon">👤</span><span>Roblox Accounts</span></a></li>
     </ul>
     <div class="sidebar-watermark">by Archie</div>
@@ -255,6 +256,79 @@
       </div>
     </div>
 
+
+    <!-- ── Convert Decal → Image ────────────────────────────── -->
+    <div id="page-convert" class="hidden">
+      <div class="page-header">
+        <h1>Decal → Image ID</h1>
+        <p>Convert Decal asset ID ke Image/Texture ID yang dipakai ImageLabel, SurfaceAppearance, dll</p>
+      </div>
+
+      <div class="card">
+        <div style="margin-bottom:18px;padding:12px 14px;background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.15);border-radius:8px;font-size:12.5px;color:rgba(180,220,255,0.85);line-height:1.9">
+          🖼️ <strong style="color:var(--neon)">Decal ID</strong> → dipakai saat pasang stiker di Part<br>
+          🎨 <strong style="color:var(--success)">Image ID</strong> → dipakai di <code>ImageLabel.Image</code>, <code>SurfaceAppearance.ColorMap</code>, dll<br>
+          API key butuh permission <strong style="color:var(--text)">Legacy APIs: legacy-asset:manage</strong>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Roblox Account</label>
+          <select class="form-input" id="convertAccount">
+            <option value="">Pilih akun...</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Paste Lua Table (berisi Decal ID)</label>
+          <textarea class="ids-textarea" id="convertInput" placeholder='return {&#10;&#9;["rbxassetid://99488084756007"] = "Asah Golok",&#10;&#9;["rbxassetid://104954843331362"] = "Udang Rebus",&#10;}'></textarea>
+          <div class="id-counter"><span id="convertCount">0</span> item terdeteksi</div>
+        </div>
+
+        <div id="convertProgress" class="dl-progress" style="display:none">
+          <div id="convertProgressText">Converting...</div>
+          <div class="prog-bar-wrap"><div class="prog-bar" id="convertProgressBar" style="width:0%"></div></div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:4px">
+          <button class="btn btn-primary" onclick="startConvert()">🔄 Convert</button>
+          <button class="btn btn-ghost btn-sm" onclick="clearConvert()">🗑 Clear</button>
+        </div>
+      </div>
+
+      <div id="convertResult" class="hidden">
+        <div class="card" style="margin-top:20px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+            <div>
+              <div class="card-title" style="margin:0">Hasil Convert</div>
+              <div id="convertSummary" style="font-size:12.5px;color:var(--muted);margin-top:4px"></div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-ghost btn-sm" onclick="copyConvertedLua()">📋 Copy Lua</button>
+              <button class="btn btn-ghost btn-sm" onclick="downloadConvertedLua()">💾 Download .lua</button>
+            </div>
+          </div>
+
+          <div class="lua-box">
+            <div class="lua-header">
+              <span>📄 images.lua (Image IDs)</span>
+              <span id="convertLineCount" style="color:var(--muted);font-weight:400">0 baris</span>
+            </div>
+            <div class="lua-content" id="convertLuaContent"></div>
+          </div>
+        </div>
+
+        <div id="convertFailBox" class="card hidden" style="margin-top:16px;border-color:rgba(255,71,87,0.2)">
+          <div class="card-title" style="color:var(--danger)">⚠️ Gagal Diconvert</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Decal ID</th><th>Nama</th><th>Error</th></tr></thead>
+              <tbody id="convertFailTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -283,6 +357,7 @@ document.querySelectorAll('.sidebar-nav a').forEach(function(link) {
     if (page === 'jobs')     loadJobs();
     if (page === 'accounts') loadAccounts();
     if (page === 'export')   generateLua();
+    if (page === 'convert')  { loadAccounts(); updateConvertCount(); }
   });
 });
 
@@ -479,8 +554,9 @@ async function loadJobs() {
 
 // ── Roblox Accounts ───────────────────────────────────────────
 async function loadAccounts() {
-  var select = document.getElementById('robloxAccount');
-  var tbody  = document.getElementById('accountsTable');
+  var select     = document.getElementById('robloxAccount');
+  var selectConv = document.getElementById('convertAccount');
+  var tbody      = document.getElementById('accountsTable');
   try {
     var accounts = await api('GET', '/user/roblox-accounts');
     var cur = select.value;
@@ -489,6 +565,15 @@ async function loadAccounts() {
       select.innerHTML += '<option value="' + a.id + '">' + a.account_name + '</option>';
     });
     if (cur) select.value = cur;
+
+    if (selectConv) {
+      var curConv = selectConv.value;
+      selectConv.innerHTML = '<option value="">Pilih akun...</option>';
+      accounts.forEach(function(a) {
+        selectConv.innerHTML += '<option value="' + a.id + '">' + a.account_name + '</option>';
+      });
+      if (curConv) selectConv.value = curConv;
+    }
 
     if (!tbody) return;
     tbody.innerHTML = !accounts.length
@@ -525,6 +610,130 @@ async function deleteAccount(id) {
   if (!confirm('Hapus akun ini?')) return;
   await api('DELETE', '/user/roblox-accounts/' + id);
   loadAccounts();
+}
+
+
+// ── Convert Decal → Image ─────────────────────────────────────
+var convertedData = [];
+
+function parseLuaTable(text) {
+  var items = [];
+  var re = /\["rbxassetid:\/\/(\d+)"\]\s*=\s*"([^"]+)"/g;
+  var m;
+  while ((m = re.exec(text)) !== null) items.push({ id: m[1], name: m[2] });
+  return items;
+}
+
+function updateConvertCount() {
+  var text  = (document.getElementById('convertInput') || {}).value || '';
+  var items = parseLuaTable(text);
+  var el    = document.getElementById('convertCount');
+  if (el) { el.textContent = items.length; el.style.color = items.length > 50 ? 'var(--danger)' : 'var(--neon)'; }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  var ta = document.getElementById('convertInput');
+  if (ta) ta.addEventListener('input', updateConvertCount);
+});
+
+function clearConvert() {
+  var ta = document.getElementById('convertInput');
+  if (ta) ta.value = '';
+  updateConvertCount();
+  document.getElementById('convertResult').classList.add('hidden');
+  document.getElementById('convertProgress').style.display = 'none';
+  convertedData = [];
+}
+
+async function startConvert() {
+  var accId = document.getElementById('convertAccount').value;
+  var text  = document.getElementById('convertInput').value;
+  var items = parseLuaTable(text);
+
+  if (!accId)         return showAlert('alert', 'Pilih Roblox account dulu');
+  if (!items.length)  return showAlert('alert', 'Paste Lua table dulu');
+  if (items.length > 50) return showAlert('alert', 'Maksimal 50 item per batch');
+
+  var btn      = document.querySelector('[onclick="startConvert()"]');
+  var progress = document.getElementById('convertProgress');
+  var progText = document.getElementById('convertProgressText');
+  var progBar  = document.getElementById('convertProgressBar');
+
+  btn.disabled = true; btn.textContent = 'Converting...';
+  progress.style.display = 'block';
+  progText.style.color   = 'var(--neon)';
+  progText.textContent   = 'Mengambil ' + items.length + ' Decal asset dari Roblox...';
+  progBar.style.width    = '10%';
+  document.getElementById('convertResult').classList.add('hidden');
+
+  try {
+    progBar.style.width = '40%';
+    var data = await api('POST', '/user/convert/decal-to-image', { items: items, roblox_account_id: accId });
+    progBar.style.width  = '100%';
+    progText.textContent = 'Selesai! ' + data.ok_count + ' berhasil, ' + data.fail_count + ' gagal.';
+    convertedData = data.results.filter(function(r) { return r.image_id; });
+    renderConvertResult(data.results);
+    document.getElementById('convertResult').classList.remove('hidden');
+    if (data.ok_count > 0) showAlert('alert', data.ok_count + ' Decal berhasil diconvert ke Image ID!', 'success');
+  } catch (err) {
+    progText.textContent = 'Error: ' + err.message;
+    progText.style.color = 'var(--danger)';
+    showAlert('alert', err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '🔄 Convert';
+    setTimeout(function() { progress.style.display = 'none'; progBar.style.width = '0%'; progText.style.color = 'var(--neon)'; }, 5000);
+  }
+}
+
+function renderConvertResult(results) {
+  var ok        = results.filter(function(r) { return r.image_id; });
+  var fail      = results.filter(function(r) { return !r.image_id; });
+  var content   = document.getElementById('convertLuaContent');
+  var lineCount = document.getElementById('convertLineCount');
+  var summary   = document.getElementById('convertSummary');
+  var failBox   = document.getElementById('convertFailBox');
+  var failTable = document.getElementById('convertFailTable');
+
+  summary.textContent   = ok.length + ' berhasil diconvert' + (fail.length ? ', ' + fail.length + ' gagal' : '');
+  lineCount.textContent = (ok.length + 2) + ' baris';
+
+  content.innerHTML = ok.length
+    ? '<span style="color:#ff79c6">return</span> {\n' +
+        ok.map(function(r) {
+          return '\t[<span style="color:#f1fa8c">"rbxassetid://<span style="color:var(--neon)">' + r.image_id + '</span>"</span>] = <span style="color:#f1fa8c">"<span style="color:#50fa7b">' + escHtml(r.name) + '</span>"</span>';
+        }).join(',\n') + '\n}'
+    : '<span style="color:var(--muted)">-- Tidak ada yang berhasil diconvert</span>';
+
+  if (fail.length) {
+    failBox.classList.remove('hidden');
+    failTable.innerHTML = fail.map(function(r) {
+      return '<tr><td><code style="color:var(--muted)">' + r.decal_id + '</code></td>' +
+        '<td>' + escHtml(r.name) + '</td>' +
+        '<td style="color:var(--danger);font-size:12px">' + escHtml(r.error || 'Unknown error') + '</td></tr>';
+    }).join('');
+  } else {
+    failBox.classList.add('hidden');
+  }
+}
+
+function getConvertedLuaText() {
+  var lines = convertedData.map(function(r) {
+    return '\t["rbxassetid://' + r.image_id + '"] = "' + r.name.replace(/"/g, '\\"') + '"';
+  });
+  return 'return {\n' + lines.join(',\n') + '\n}';
+}
+
+async function copyConvertedLua() {
+  if (!convertedData.length) return showAlert('alert', 'Jalankan Convert dulu');
+  try { await navigator.clipboard.writeText(getConvertedLuaText()); showAlert('alert', 'Tabel Image ID disalin!', 'success'); }
+  catch { showAlert('alert', 'Gagal copy — coba select manual'); }
+}
+
+function downloadConvertedLua() {
+  if (!convertedData.length) return showAlert('alert', 'Jalankan Convert dulu');
+  var blob = new Blob([getConvertedLuaText()], { type: 'text/plain' });
+  var a    = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'images_converted.lua';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(a.href);
 }
 
 init();
