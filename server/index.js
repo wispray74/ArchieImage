@@ -36,6 +36,7 @@ app.use(session({
 app.use(express.static(path.join(__dirname, '../web')));
 app.use('/auth',  require('./routes/auth'));
 app.use('/user',  require('./routes/user'));
+app.use('/user/convert', require('./routes/convert'));
 app.use('/admin', require('./routes/admin'));
 
 app.get('/health', (req, res) => res.json({ status: 'ok', app: 'Archie Image' }));
