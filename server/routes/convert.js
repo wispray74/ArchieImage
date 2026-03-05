@@ -44,22 +44,27 @@ async function fetchRaw(assetId, apiKey) {
   return maybeDecompress(buf);
 }
 
-// Parse Image ID (TextureId) dari XML Decal asset
-// Decal XML: <Content name="Texture"><url>rbxassetid://IMAGE_ID</url></Content>
+// Parse Image ID dari XML Decal.
+// Roblox lama: <url>rbxassetid://ID</url>
+// Roblox baru: <uri>rbxassetid://ID</uri>
 function parseTextureId(buffer) {
-  const text = buffer.slice(0, 8192).toString('utf8');
+  const text = buffer.toString('utf8');
 
-  // Coba match Texture content dulu
-  let m = text.match(/name="Texture"[\s\S]{0,200}?rbxassetid:\/\/(\d+)/i);
+  // format baru: <uri>
+  let m = text.match(/<uri>rbxassetid:\/\/(\d+)<\/uri>/i);
   if (m) return m[1];
 
-  // Fallback: <url>rbxassetid://ID</url>
+  // format lama: <url>
   m = text.match(/<url>rbxassetid:\/\/(\d+)<\/url>/i);
   if (m) return m[1];
 
-  // Fallback: angka pertama setelah rbxassetid
-  m = text.match(/rbxassetid:\/\/(\d+)/i);
+  // name="Texture" diikuti rbxassetid
+  m = text.match(/name="Texture"[\s\S]{0,300}?rbxassetid:\/\/(\d+)/i);
   if (m) return m[1];
+
+  // ambil semua rbxassetid, return yang pertama
+  const all = [...text.matchAll(/rbxassetid:\/\/(\d+)/gi)].map(x => x[1]);
+  if (all.length) return all[0];
 
   return null;
 }
