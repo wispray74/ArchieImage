@@ -19,7 +19,10 @@ router.post('/login', async (req, res) => {
 
     req.session.user = { id: user.id, email: user.email, role: user.role, expires_at: user.expires_at || null };
     res.json({ role: user.role });
-  } catch { res.status(500).json({ error: 'Server error' }); }
+  } catch (err) {
+    console.error('[Login]', err);
+    res.status(500).json({ error: err.message || 'Server error' });
+  }
 });
 
 router.post('/logout', (req, res) => { req.session.destroy(); res.json({ success: true }); });
@@ -31,14 +34,23 @@ router.get('/me', (req, res) => {
 
 router.post('/setup', async (req, res) => {
   try {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Email dan password wajib' });
+
     const count = await db.query('SELECT COUNT(*) FROM users');
     if (parseInt(count.rows[0].count) > 0)
-      return res.status(403).json({ error: 'Setup sudah dilakukan' });
-    const { email, password } = req.body;
+      return res.status(403).json({ error: 'Setup sudah dilakukan. Silakan login.' });
+
     const hashed = await bcrypt.hash(password, 12);
-    await db.query('INSERT INTO users (email, password, role) VALUES ($1, $2, $3)', [email, hashed, 'admin']);
+    await db.query(
+      'INSERT INTO users (email, password, role) VALUES ($1, $2, $3)',
+      [email, hashed, 'admin']
+    );
     res.json({ success: true });
-  } catch { res.status(500).json({ error: 'Server error' }); }
+  } catch (err) {
+    console.error('[Setup]', err);
+    res.status(500).json({ error: err.message || 'Server error' });
+  }
 });
 
 module.exports = router;
