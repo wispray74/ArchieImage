@@ -137,3 +137,34 @@ router.post('/decal-to-image', requireAuth, async (req, res) => {
 });
 
 module.exports = router;
+
+// ── GET /user/convert/debug/:assetId ─────────────────────────
+// Lihat raw content asset untuk debug parsing
+router.get('/debug/:assetId', requireAuth, async (req, res) => {
+  try {
+    const assetId = req.params.assetId;
+    const robloxAccId = req.query.account_id;
+    if (!robloxAccId) return res.status(400).json({ error: 'Tambah ?account_id=ID' });
+
+    const accResult = await db.query(
+      'SELECT api_key_encrypted FROM roblox_accounts WHERE id = $1 AND user_id = $2',
+      [robloxAccId, req.session.user.id]
+    );
+    if (!accResult.rows.length) return res.status(403).json({ error: 'Account tidak ditemukan' });
+    const apiKey = decrypt(accResult.rows[0].api_key_encrypted).trim();
+
+    const buffer = await fetchRaw(assetId, apiKey);
+    const text   = buffer.toString('utf8');
+
+    res.json({
+      asset_id:       assetId,
+      size_bytes:     buffer.length,
+      first_16_hex:   buffer.slice(0, 16).toString('hex'),
+      first_500_text: text.slice(0, 500),
+      all_rbxassetids: [...text.matchAll(/rbxassetid:\/\/(\d+)/gi)].map(m => m[1]),
+      all_numbers_6plus: [...text.matchAll(/\b(\d{6,})\b/g)].map(m => m[1]).slice(0, 20),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
