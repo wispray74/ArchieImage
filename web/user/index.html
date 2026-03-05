@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — Archie Image</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .image-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 10px; margin-top: 14px;
+    }
+    .image-thumb {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px;
+      text-align: center; font-size: 11.5px;
+      transition: border-color 0.2s;
+    }
+    .image-thumb:hover { border-color: rgba(0,212,255,0.3); }
+    .image-thumb .thumb-icon { font-size: 28px; margin-bottom: 6px; }
+    .image-thumb .thumb-name {
+      color: var(--text); font-weight: 500;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .image-thumb .thumb-size { color: var(--muted); font-size: 10.5px; margin-top: 2px; }
+
+    .lua-box {
+      background: rgba(0,0,0,0.4);
+      border: 1px solid rgba(0,212,255,0.2);
+      border-radius: 10px; padding: 0; overflow: hidden;
+    }
+    .lua-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px;
+      background: rgba(0,212,255,0.06);
+      border-bottom: 1px solid rgba(0,212,255,0.15);
+      font-size: 12px; font-weight: 600; color: var(--neon);
+    }
+    .lua-content {
+      padding: 14px;
+      font-family: 'Courier New', monospace;
+      font-size: 12.5px; color: var(--text);
+      line-height: 1.9; white-space: pre;
+      overflow-x: auto; max-height: 500px; overflow-y: auto;
+    }
+    .lua-keyword { color: #ff79c6; }
+    .lua-string  { color: #f1fa8c; }
+    .lua-id      { color: var(--neon); }
+    .lua-name    { color: #50fa7b; }
+
+    .stat-row {
+      display: flex; gap: 12px; margin-bottom: 20px;
+    }
+    .stat-pill {
+      padding: 6px 14px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 20px; font-size: 12.5px;
+    }
+    .stat-pill span { font-weight: 700; }
+    .stat-pill .num-waiting    { color: var(--muted); }
+    .stat-pill .num-processing { color: var(--warning); }
+    .stat-pill .num-uploaded   { color: var(--success); }
+    .stat-pill .num-failed     { color: var(--danger); }
+
+    .upload-counter {
+      font-size: 12px; color: var(--muted);
+      margin-top: 10px; text-align: center;
+    }
+    .upload-counter strong { color: var(--neon); }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <span class="brand">Archie Image</span>
+      <span class="sub">Roblox Uploader</span>
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="#" class="active" data-page="upload"><span class="icon">🖼️</span><span>Upload</span></a></li>
+      <li><a href="#" data-page="export"><span class="icon">📋</span><span>Export Lua</span></a></li>
+      <li><a href="#" data-page="jobs"><span class="icon">⏳</span><span>Jobs</span></a></li>
+      <li><a href="#" data-page="accounts"><span class="icon">👤</span><span>Roblox Accounts</span></a></li>
+    </ul>
+    <div class="sidebar-watermark">by Archie</div>
+    <div class="sidebar-bottom">
+      <span class="u-email" id="userEmail">Loading...</span>
+      <a href="#" onclick="logout()">Logout</a>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div id="alert" class="hidden"></div>
+
+    <!-- ── Upload ──────────────────────────────────────────── -->
+    <div id="page-upload">
+      <div class="page-header">
+        <h1>Upload Gambar</h1>
+        <p>Batch upload gambar ke Roblox sebagai Decal — nama file = nama asset</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Pengaturan</div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">Roblox Account</label>
+            <select class="form-input" id="robloxAccount" required>
+              <option value="">Pilih akun...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Group ID (opsional)</label>
+            <input type="number" class="form-input" id="groupId" placeholder="Kosong = personal">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Gambar (PNG / JPG / GIF / BMP / WEBP)</label>
+          <label class="file-drop" id="fileDrop">
+            <input type="file" id="fileInput" accept=".png,.jpg,.jpeg,.gif,.bmp,.webp" multiple>
+            <div class="file-drop-text">
+              <strong>🖼️ Klik atau drag gambar ke sini</strong>
+              Batch upload hingga 50 file sekaligus<br>
+              <span style="font-size:11px;color:var(--muted)">Nama file → nama asset di Roblox</span>
+            </div>
+          </label>
+          <div id="fileChips" class="file-chips"></div>
+          <div id="fileCounter" class="upload-counter hidden"></div>
+        </div>
+
+        <div id="progressWrap" class="progress-wrap hidden">
+          <div class="progress-bar-bg"><div class="progress-bar" id="progressBar" style="width:0%"></div></div>
+          <div class="progress-text" id="progressText">Uploading...</div>
+        </div>
+
+        <div style="display:flex;gap:10px;align-items:center;margin-top:8px">
+          <button type="button" class="btn btn-primary" id="uploadBtn" onclick="submitUpload()">⬆️ Upload ke Roblox</button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="clearFiles()">🗑 Clear</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:20px">
+        <div class="card-title" style="margin-bottom:10px">Tips</div>
+        <div style="font-size:13px;color:var(--muted);line-height:2">
+          📌 Nama file (tanpa ekstensi) akan menjadi nama asset di Roblox<br>
+          📌 Contoh: <code style="color:var(--neon)">Asah Golok.png</code> → <code style="color:var(--success)">"Asah Golok"</code><br>
+          📌 API key wajib punya permission <strong style="color:var(--text)">Assets: Read + Write</strong><br>
+          📌 Setelah upload selesai, buka tab <strong style="color:var(--neon)">Export Lua</strong> untuk salin tabel
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Export Lua ──────────────────────────────────────── -->
+    <div id="page-export" class="hidden">
+      <div class="page-header">
+        <h1>Export Lua Table</h1>
+        <p>Salin tabel rbxassetid untuk dipakai di script Roblox</p>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:20px">
+          <div class="form-group" style="margin:0;flex:1;min-width:160px">
+            <label class="form-label">Filter Group ID (opsional)</label>
+            <input type="number" class="form-input" id="exportGroupId" placeholder="Kosong = semua">
+          </div>
+          <div style="display:flex;gap:8px;align-items:flex-end;padding-bottom:0">
+            <button class="btn btn-primary" onclick="generateLua()">🔄 Generate</button>
+            <button class="btn btn-ghost btn-sm" onclick="copyLua()">📋 Copy</button>
+            <button class="btn btn-ghost btn-sm" onclick="downloadLua()">💾 Download .lua</button>
+          </div>
+        </div>
+
+        <div id="luaStats" class="stat-row hidden">
+          <div class="stat-pill"><span class="num-uploaded" id="luaCount">0</span> gambar</div>
+        </div>
+
+        <div class="lua-box">
+          <div class="lua-header">
+            <span>📄 output.lua</span>
+            <span id="luaLineCount" style="color:var(--muted);font-weight:400">0 baris</span>
+          </div>
+          <div class="lua-content" id="luaContent">
+            <span style="color:var(--muted)">-- Klik "Generate" untuk membuat tabel</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Jobs ────────────────────────────────────────────── -->
+    <div id="page-jobs" class="hidden">
+      <div class="page-header">
+        <h1>Upload Jobs</h1>
+        <p>Status upload gambar kamu — auto refresh tiap 5 detik</p>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+          <div id="jobStats" class="stat-row" style="margin:0"></div>
+          <button class="btn btn-ghost btn-sm" onclick="loadJobs()">Refresh</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>ID</th><th>Nama Gambar</th><th>Status</th><th>Asset ID</th><th>Waktu</th></tr>
+            </thead>
+            <tbody id="jobsTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Accounts ─────────────────────────────────────────── -->
+    <div id="page-accounts" class="hidden">
+      <div class="page-header">
+        <h1>Roblox Accounts</h1>
+        <p>Kelola akun Roblox untuk upload</p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Tambah Akun</div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">Nama Akun</label>
+            <input type="text" class="form-input" id="accName" placeholder="Contoh: MyAccount">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Roblox User ID</label>
+            <input type="number" class="form-input" id="accUserId" placeholder="123456789">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Open Cloud API Key</label>
+          <input type="password" class="form-input" id="accApiKey" placeholder="Dari create.roblox.com/credentials">
+          <div style="margin-top:10px;padding:12px 14px;background:rgba(255,184,0,0.07);border:1px solid rgba(255,184,0,0.2);border-radius:8px;font-size:12px;color:rgba(255,220,100,0.9);line-height:1.9">
+            ⚠️ API key perlu permission: <strong style="color:#fff">Assets: Read + Write</strong><br>
+            → <a href="https://create.roblox.com/dashboard/credentials" target="_blank" style="color:var(--neon)">create.roblox.com/credentials</a>
+            → Create API Key → API System: <strong>Assets</strong> → centang Read + Write → Save
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="saveAccount()">Simpan Akun</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Akun Tersimpan</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Nama</th><th>User ID</th><th>Ditambah</th><th></th></tr></thead>
+            <tbody id="accountsTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="/js/utils.js"></script>
+<script>
+var currentPage = 'upload';
+var selectedFiles = [];
+
+async function init() {
+  try {
+    var me = await api('GET', '/auth/me');
+    document.getElementById('userEmail').textContent = me.email;
+    await loadAccounts();
+  } catch (e) { window.location.href = '/login.html'; }
+}
+
+document.querySelectorAll('.sidebar-nav a').forEach(function(link) {
+  link.addEventListener('click', function(e) {
+    e.preventDefault();
+    var page = link.dataset.page;
+    document.querySelectorAll('.sidebar-nav a').forEach(function(l) { l.classList.remove('active'); });
+    link.classList.add('active');
+    document.querySelectorAll('[id^="page-"]').forEach(function(el) { el.classList.add('hidden'); });
+    document.getElementById('page-' + page).classList.remove('hidden');
+    currentPage = page;
+    if (page === 'jobs')     loadJobs();
+    if (page === 'accounts') loadAccounts();
+    if (page === 'export')   generateLua();
+  });
+});
+
+// ── File selection ────────────────────────────────────────────
+var fileInput = document.getElementById('fileInput');
+var fileDrop  = document.getElementById('fileDrop');
+
+fileInput.addEventListener('change', function() { handleFiles(Array.from(fileInput.files)); });
+fileDrop.addEventListener('dragover',  function(e) { e.preventDefault(); fileDrop.classList.add('drag-over'); });
+fileDrop.addEventListener('dragleave', function()  { fileDrop.classList.remove('drag-over'); });
+fileDrop.addEventListener('drop',      function(e) {
+  e.preventDefault(); fileDrop.classList.remove('drag-over');
+  var dropped = Array.from(e.dataTransfer.files).filter(function(f) {
+    return /\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(f.name);
+  });
+  handleFiles(dropped);
+});
+
+function handleFiles(files) {
+  selectedFiles = files.slice(0, 50);
+  var chips  = document.getElementById('fileChips');
+  var counter = document.getElementById('fileCounter');
+  chips.innerHTML = selectedFiles.map(function(f) {
+    var name = f.name.length > 20 ? f.name.substring(0, 18) + '…' : f.name;
+    var size = (f.size / 1024).toFixed(0) + 'KB';
+    return '<span class="file-chip">🖼️ ' + name + ' <span style="color:var(--muted)">(' + size + ')</span></span>';
+  }).join('');
+  if (selectedFiles.length > 0) {
+    counter.classList.remove('hidden');
+    counter.innerHTML = '<strong>' + selectedFiles.length + '</strong> gambar dipilih' +
+      (files.length > 50 ? ' <span style="color:var(--danger)">(max 50, ' + (files.length - 50) + ' diabaikan)</span>' : '');
+  } else {
+    counter.classList.add('hidden');
+  }
+}
+
+function clearFiles() {
+  selectedFiles = [];
+  fileInput.value = '';
+  document.getElementById('fileChips').innerHTML = '';
+  document.getElementById('fileCounter').classList.add('hidden');
+}
+
+// ── Upload ────────────────────────────────────────────────────
+async function submitUpload() {
+  var accId = document.getElementById('robloxAccount').value;
+  if (!accId)                return showAlert('alert', 'Pilih Roblox account dulu', 'error');
+  if (!selectedFiles.length) return showAlert('alert', 'Pilih minimal 1 gambar', 'error');
+
+  var btn      = document.getElementById('uploadBtn');
+  var progWrap = document.getElementById('progressWrap');
+  var progBar  = document.getElementById('progressBar');
+  var progText = document.getElementById('progressText');
+
+  btn.disabled = true; btn.textContent = 'Uploading...';
+  progWrap.classList.remove('hidden');
+  progBar.style.width = '10%';
+  progText.textContent = 'Mengirim ' + selectedFiles.length + ' gambar ke server...';
+
+  try {
+    var form = new FormData();
+    form.append('roblox_account_id', accId);
+    form.append('group_id', document.getElementById('groupId').value || '');
+    selectedFiles.forEach(function(f) { form.append('files', f); });
+
+    progBar.style.width = '40%';
+    var data = await apiForm('/user/upload', form);
+    progBar.style.width = '100%';
+    progText.textContent = '✓ ' + data.count + ' gambar berhasil di-queue!';
+    showAlert('alert', data.count + ' gambar masuk antrian upload! Cek di tab Jobs.', 'success');
+    clearFiles();
+    setTimeout(function() { progWrap.classList.add('hidden'); progBar.style.width = '0%'; }, 3000);
+  } catch (err) {
+    progText.textContent = '✕ ' + err.message;
+    progBar.style.background = 'var(--danger)';
+    showAlert('alert', err.message, 'error');
+    setTimeout(function() { progWrap.classList.add('hidden'); progBar.style.width = '0%'; progBar.style.background = ''; }, 4000);
+  } finally {
+    btn.disabled = false; btn.textContent = '⬆️ Upload ke Roblox';
+  }
+}
+
+// ── Lua Export ────────────────────────────────────────────────
+var luaData = [];
+
+async function generateLua() {
+  var groupId = document.getElementById('exportGroupId').value;
+  var url     = '/user/export-lua' + (groupId ? '?group_id=' + groupId : '');
+  try {
+    luaData = await api('GET', url);
+    renderLua();
+  } catch (err) { showAlert('alert', err.message, 'error'); }
+}
+
+function renderLua() {
+  var content = document.getElementById('luaContent');
+  var lineCount = document.getElementById('luaLineCount');
+  var stats    = document.getElementById('luaStats');
+  var count    = document.getElementById('luaCount');
+
+  if (!luaData.length) {
+    content.innerHTML = '<span style="color:var(--muted)">-- Belum ada gambar yang terupload</span>';
+    lineCount.textContent = '0 baris';
+    stats.classList.add('hidden');
+    return;
+  }
+
+  var lines = luaData.map(function(row) {
+    var name = (row.original_name || row.title || '').replace(/"/g, '\\"');
+    return '\t["rbxassetid://' + row.asset_id + '"] = "' + name + '"';
+  });
+
+  var html = '<span class="lua-keyword">return</span> {\n' +
+    lines.map(function(line) {
+      var m = line.match(/\["rbxassetid:\/\/(\d+)"\] = "(.+)"/);
+      if (!m) return escHtml(line) + ',';
+      return '\t[<span class="lua-string">"rbxassetid://<span class="lua-id">' + m[1] + '</span>"</span>] = <span class="lua-string">"<span class="lua-name">' + escHtml(m[2]) + '</span>"</span>';
+    }).join(',\n') +
+    '\n}';
+
+  content.innerHTML = html;
+  lineCount.textContent = (luaData.length + 2) + ' baris';
+  count.textContent = luaData.length;
+  stats.classList.remove('hidden');
+}
+
+function getLuaText() {
+  var lines = luaData.map(function(row) {
+    var name = (row.original_name || row.title || '').replace(/"/g, '\\"');
+    return '\t["rbxassetid://' + row.asset_id + '"] = "' + name + '"';
+  });
+  return 'return {\n' + lines.join(',\n') + '\n}';
+}
+
+async function copyLua() {
+  if (!luaData.length) return showAlert('alert', 'Generate dulu', 'error');
+  try {
+    await navigator.clipboard.writeText(getLuaText());
+    showAlert('alert', 'Tabel Lua berhasil disalin!', 'success');
+  } catch { showAlert('alert', 'Gagal copy — coba select manual', 'error'); }
+}
+
+function downloadLua() {
+  if (!luaData.length) return showAlert('alert', 'Generate dulu', 'error');
+  var blob = new Blob([getLuaText()], { type: 'text/plain' });
+  var a    = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'images.lua';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Jobs ─────────────────────────────────────────────────────
+async function loadJobs() {
+  var tbody  = document.getElementById('jobsTable');
+  var stats  = document.getElementById('jobStats');
+  tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">Loading...</td></tr>';
+  try {
+    var jobs = await api('GET', '/user/jobs');
+    if (!jobs.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">Belum ada jobs</td></tr>';
+      stats.innerHTML = ''; return;
+    }
+    var counts = { waiting:0, processing:0, uploaded:0, failed:0 };
+    jobs.forEach(function(j) { if (counts[j.status] !== undefined) counts[j.status]++; });
+    stats.innerHTML =
+      (counts.waiting    ? '<div class="stat-pill"><span class="num-waiting">'    + counts.waiting    + '</span> waiting</div>'    : '') +
+      (counts.processing ? '<div class="stat-pill"><span class="num-processing">' + counts.processing + '</span> processing</div>' : '') +
+      (counts.uploaded   ? '<div class="stat-pill"><span class="num-uploaded">'   + counts.uploaded   + '</span> uploaded</div>'   : '') +
+      (counts.failed     ? '<div class="stat-pill"><span class="num-failed">'     + counts.failed     + '</span> failed</div>'     : '');
+
+    tbody.innerHTML = jobs.map(function(j) {
+      var assetCell = j.asset_id
+        ? '<code style="color:var(--neon)">' + j.asset_id + '</code>'
+        : j.error_message
+          ? '<span style="color:var(--danger);font-size:12px">' + j.error_message.substring(0, 60) + '</span>'
+          : '—';
+      return '<tr>' +
+        '<td style="color:var(--muted)">#' + j.id + '</td>' +
+        '<td>' + (j.original_name || j.title) + '</td>' +
+        '<td>' + badge(j.status) + '</td>' +
+        '<td>' + assetCell + '</td>' +
+        '<td style="color:var(--muted)">' + fmtDate(j.created_at) + '</td>' +
+        '</tr>';
+    }).join('');
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--danger)">' + err.message + '</td></tr>';
+  }
+}
+
+// ── Roblox Accounts ───────────────────────────────────────────
+async function loadAccounts() {
+  var select = document.getElementById('robloxAccount');
+  var tbody  = document.getElementById('accountsTable');
+  try {
+    var accounts = await api('GET', '/user/roblox-accounts');
+    var cur = select.value;
+    select.innerHTML = '<option value="">Pilih akun...</option>';
+    accounts.forEach(function(a) {
+      select.innerHTML += '<option value="' + a.id + '">' + a.account_name + '</option>';
+    });
+    if (cur) select.value = cur;
+
+    if (!tbody) return;
+    tbody.innerHTML = !accounts.length
+      ? '<tr><td colspan="4" style="color:var(--muted)">Belum ada akun</td></tr>'
+      : accounts.map(function(a) {
+          return '<tr>' +
+            '<td>' + a.account_name + '</td>' +
+            '<td style="color:var(--muted)">' + (a.roblox_user_id || '—') + '</td>' +
+            '<td style="color:var(--muted)">' + fmtDate(a.created_at) + '</td>' +
+            '<td><button class="btn btn-danger btn-sm" onclick="deleteAccount(' + a.id + ')">Hapus</button></td>' +
+            '</tr>';
+        }).join('');
+  } catch (e) {}
+}
+
+async function saveAccount() {
+  var name   = document.getElementById('accName').value.trim();
+  var userId = document.getElementById('accUserId').value.trim();
+  var apiKey = document.getElementById('accApiKey').value.trim();
+  if (!name)   return showAlert('alert', 'Isi nama akun');
+  if (!userId) return showAlert('alert', 'Isi Roblox User ID');
+  if (!apiKey) return showAlert('alert', 'Isi API key');
+  try {
+    var data = await api('POST', '/user/roblox-accounts', { account_name: name, roblox_user_id: parseInt(userId), api_key: apiKey });
+    showAlert('alert', 'Akun "' + data.account_name + '" berhasil ditambah!', 'success');
+    document.getElementById('accName').value   = '';
+    document.getElementById('accUserId').value = '';
+    document.getElementById('accApiKey').value = '';
+    loadAccounts();
+  } catch (err) { showAlert('alert', err.message); }
+}
+
+async function deleteAccount(id) {
+  if (!confirm('Hapus akun ini?')) return;
+  await api('DELETE', '/user/roblox-accounts/' + id);
+  loadAccounts();
+}
+
+init();
+setInterval(function() { if (currentPage === 'jobs') loadJobs(); }, 5000);
+</script>
+</body>
+</html>

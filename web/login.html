@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Archie Image — Login</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --neon:#00d4ff; --neon2:#9b59ff; --bg:#06060f; --card:rgba(14,14,26,0.85); --border:rgba(255,255,255,0.08); --text:#e8e8f0; --muted:#5a5a78; --danger:#ff4757; --success:#00e887; }
+    body { font-family:'Space Grotesk',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+    .bg-grid { position:fixed; inset:-100px; background-image:linear-gradient(rgba(0,212,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,0.03) 1px,transparent 1px); background-size:60px 60px; animation:gridScroll 25s linear infinite; }
+    @keyframes gridScroll { from{transform:translate(0,0)} to{transform:translate(60px,60px)} }
+    .orb { position:fixed; border-radius:50%; pointer-events:none; filter:blur(90px); }
+    .orb-1 { width:600px;height:600px;background:radial-gradient(circle,rgba(0,212,255,0.15),transparent 70%);top:-200px;left:-200px; animation:floatA 14s ease-in-out infinite; }
+    .orb-2 { width:500px;height:500px;background:radial-gradient(circle,rgba(155,89,255,0.15),transparent 70%);bottom:-150px;right:-150px; animation:floatB 18s ease-in-out infinite; }
+    @keyframes floatA { 0%,100%{transform:translate(0,0)} 33%{transform:translate(40px,-40px)} 66%{transform:translate(-25px,30px)} }
+    @keyframes floatB { 0%,100%{transform:translate(0,0)} 33%{transform:translate(-40px,30px)} 66%{transform:translate(30px,-20px)} }
+    .wrap { position:relative; z-index:10; width:100%; max-width:420px; padding:20px; animation:entrance 0.8s cubic-bezier(0.16,1,0.3,1) both; }
+    @keyframes entrance { from{opacity:0;transform:translateY(40px)} to{opacity:1;transform:translateY(0)} }
+    .logo-block { text-align:center; margin-bottom:36px; }
+    .logo-icon { font-size:52px; display:block; margin-bottom:14px; animation:pulse 2s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+    .logo-title { font-size:28px; font-weight:700; background:linear-gradient(135deg,#fff,var(--neon) 55%,var(--neon2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+    .logo-sub { color:var(--muted); font-size:12px; margin-top:6px; letter-spacing:2px; text-transform:uppercase; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:20px; padding:32px; backdrop-filter:blur(24px); position:relative; overflow:hidden; }
+    .card::before { content:''; position:absolute; top:0; left:10%; right:10%; height:1px; background:linear-gradient(90deg,transparent,var(--neon),var(--neon2),transparent); }
+    .form-group { margin-bottom:18px; }
+    .form-label { display:block; margin-bottom:7px; font-size:12px; color:var(--muted); font-weight:500; text-transform:uppercase; }
+    .form-input { width:100%; padding:11px 14px; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:10px; color:var(--text); font-family:'Space Grotesk',sans-serif; font-size:14px; outline:none; transition:all 0.2s; }
+    .form-input:focus { border-color:var(--neon); box-shadow:0 0 0 3px rgba(0,212,255,0.07); }
+    .form-input::placeholder { color:rgba(255,255,255,0.18); }
+    .btn-login { width:100%; padding:13px; background:linear-gradient(135deg,var(--neon),var(--neon2)); border:none; border-radius:10px; color:#fff; font-family:'Space Grotesk',sans-serif; font-size:14.5px; font-weight:700; cursor:pointer; transition:all 0.2s; margin-top:6px; }
+    .btn-login:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 8px 30px rgba(0,212,255,0.3); }
+    .btn-login:disabled { opacity:0.6; cursor:not-allowed; }
+    .alert { padding:11px 14px; border-radius:9px; font-size:13px; margin-bottom:18px; display:none; }
+    .alert.show { display:block; }
+    .alert-error   { background:rgba(255,71,87,0.1); border:1px solid rgba(255,71,87,0.25); color:#ff4757; }
+    .alert-success { background:rgba(0,232,135,0.1); border:1px solid rgba(0,232,135,0.25); color:#00e887; }
+    .setup-link { text-align:center; margin-top:16px; font-size:12px; color:var(--muted); }
+    .setup-link a { color:var(--neon); text-decoration:none; }
+  </style>
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+
+  <div class="wrap">
+    <div class="logo-block">
+      <span class="logo-icon">🖼️</span>
+      <div class="logo-title">Archie Image</div>
+      <div class="logo-sub">Roblox Image Uploader</div>
+    </div>
+
+    <div class="card">
+      <div id="alert" class="alert"></div>
+      <form id="loginForm">
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input type="email" class="form-input" id="email" placeholder="you@example.com" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" class="form-input" id="password" placeholder="Password" required>
+        </div>
+        <button type="submit" class="btn-login" id="loginBtn">Sign In</button>
+      </form>
+    </div>
+
+    <div class="setup-link"><a href="/setup.html">First time? Setup admin →</a></div>
+  </div>
+
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('loginBtn');
+      const al  = document.getElementById('alert');
+      btn.disabled = true; btn.textContent = 'Signing in...';
+      al.className = 'alert';
+      try {
+        const res  = await fetch('/auth/login', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({ email: document.getElementById('email').value, password: document.getElementById('password').value }) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        al.className = 'alert alert-success show';
+        al.textContent = 'Login berhasil, redirecting...';
+        setTimeout(() => { window.location.href = data.role === 'admin' ? '/admin/' : '/user/'; }, 700);
+      } catch (err) {
+        al.className = 'alert alert-error show';
+        al.textContent = err.message;
+        btn.disabled = false; btn.textContent = 'Sign In';
+      }
+    });
+  </script>
+</body>
+</html>

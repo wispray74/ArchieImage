@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Setup — Archie Image</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{--neon:#00d4ff;--neon2:#9b59ff;--bg:#06060f;--card:rgba(14,14,26,0.85);--border:rgba(255,255,255,0.08);--text:#e8e8f0;--muted:#5a5a78;--danger:#ff4757;--success:#00e887}
+    body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center}
+    .wrap{width:100%;max-width:420px;padding:20px}
+    .top{text-align:center;margin-bottom:30px}
+    .top h1{font-size:24px;font-weight:700;background:linear-gradient(135deg,#fff,var(--neon));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .top p{color:var(--muted);font-size:13px;margin-top:6px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:32px;backdrop-filter:blur(24px);position:relative;overflow:hidden}
+    .card::before{content:'';position:absolute;top:0;left:10%;right:10%;height:1px;background:linear-gradient(90deg,transparent,var(--neon),var(--neon2),transparent)}
+    .form-group{margin-bottom:18px}
+    .form-label{display:block;margin-bottom:7px;font-size:12px;color:var(--muted);font-weight:500;text-transform:uppercase}
+    .form-input{width:100%;padding:11px 14px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:14px;outline:none;transition:all .2s}
+    .form-input:focus{border-color:var(--neon);box-shadow:0 0 0 3px rgba(0,212,255,.07)}
+    .form-input::placeholder{color:rgba(255,255,255,.18)}
+    .btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--neon),var(--neon2));border:none;border-radius:10px;color:#fff;font-family:'Space Grotesk',sans-serif;font-size:14.5px;font-weight:700;cursor:pointer;transition:all .2s;margin-top:6px}
+    .btn:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,212,255,.3)}
+    .alert{padding:11px 14px;border-radius:9px;font-size:13px;margin-bottom:18px;display:none}
+    .alert.show{display:block}
+    .alert-error{background:rgba(255,71,87,.1);border:1px solid rgba(255,71,87,.25);color:var(--danger)}
+    .alert-success{background:rgba(0,232,135,.1);border:1px solid rgba(0,232,135,.25);color:var(--success)}
+    .back{text-align:center;margin-top:16px;font-size:12px;color:var(--muted)}
+    .back a{color:var(--neon);text-decoration:none}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <h1>🖼️ Archie Image</h1>
+      <p>Buat akun admin pertama</p>
+    </div>
+    <div class="card">
+      <div id="alert" class="alert"></div>
+      <form id="setupForm">
+        <div class="form-group">
+          <label class="form-label">Email Admin</label>
+          <input type="email" class="form-input" id="email" placeholder="admin@example.com" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" class="form-input" id="password" placeholder="Min. 8 karakter" minlength="8" required>
+        </div>
+        <button type="submit" class="btn">Buat Admin Account</button>
+      </form>
+    </div>
+    <div class="back"><a href="/login.html">← Kembali ke login</a></div>
+  </div>
+  <script>
+    document.getElementById('setupForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const al = document.getElementById('alert');
+      try {
+        const res  = await fetch('/auth/setup', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email: document.getElementById('email').value, password: document.getElementById('password').value }) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        al.className = 'alert alert-success show';
+        al.textContent = 'Admin dibuat! Redirect ke login...';
+        setTimeout(() => window.location.href = '/login.html', 1500);
+      } catch (err) {
+        al.className = 'alert alert-error show';
+        al.textContent = err.message;
+      }
+    });
+  </script>
+</body>
+</html>

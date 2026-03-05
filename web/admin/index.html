@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — Archie Image</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <span class="brand">Archie Image</span>
+      <span class="sub">Admin Panel</span>
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="#" class="active" data-page="users"><span class="icon">👥</span><span>Users</span></a></li>
+      <li><a href="#" data-page="jobs"><span class="icon">📋</span><span>All Jobs</span></a></li>
+    </ul>
+    <div class="sidebar-watermark">by Archie</div>
+    <div class="sidebar-bottom">
+      <span class="u-email" id="userEmail">Admin</span>
+      <a href="#" onclick="logout()">Logout</a>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div id="alert" class="hidden"></div>
+
+    <!-- Users -->
+    <div id="page-users">
+      <div class="page-header"><h1>Users</h1><p>Kelola semua user</p></div>
+      <div class="card">
+        <div class="card-title">Buat User</div>
+        <form id="createUserForm">
+          <div class="grid-3">
+            <div class="form-group">
+              <label class="form-label">Email</label>
+              <input type="email" class="form-input" id="newEmail" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Password</label>
+              <input type="password" class="form-input" id="newPassword" minlength="8" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Role</label>
+              <select class="form-input" id="newRole">
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label">Expiry Date (opsional)</label>
+              <input type="date" class="form-input" id="newExpiry">
+            </div>
+            <div class="form-group">
+              <label class="form-label">— atau — Durasi (hari)</label>
+              <input type="number" class="form-input" id="newExpiryDays" placeholder="Contoh: 30" min="1">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm">Buat User</button>
+        </form>
+      </div>
+      <div class="card">
+        <div class="card-title">Semua User</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>ID</th><th>Email</th><th>Role</th><th>Expiry</th><th>Dibuat</th><th>Aksi</th></tr></thead>
+            <tbody id="usersTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Jobs -->
+    <div id="page-jobs" class="hidden">
+      <div class="page-header"><h1>All Jobs</h1><p>Semua aktivitas upload (500 terakhir)</p></div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+          <div class="card-title" style="margin:0">Jobs</div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost btn-sm" onclick="resetStuckJobs()">Reset Stuck</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteAllJobs()">Hapus Semua</button>
+            <button class="btn btn-ghost btn-sm" onclick="loadJobs()">Refresh</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>ID</th><th>User</th><th>Nama Gambar</th><th>Account</th><th>Status</th><th>Asset ID</th><th>Waktu</th></tr></thead>
+          <tbody id="jobsTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Reset PW Modal -->
+<div id="resetModal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-title">Reset Password</div>
+    <div class="form-group">
+      <label class="form-label">Password Baru</label>
+      <input type="password" class="form-input" id="resetPassword" minlength="8" placeholder="Min. 8 karakter">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('resetModal').classList.add('hidden')">Batal</button>
+      <button class="btn btn-primary btn-sm" onclick="confirmReset()">Reset</button>
+    </div>
+  </div>
+</div>
+
+<!-- Expiry Modal -->
+<div id="expiryModal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-title">⏳ Set Expiry</div>
+    <div class="form-group">
+      <label class="form-label">Tambah Durasi (hari dari sekarang)</label>
+      <input type="number" class="form-input" id="expiryDays" placeholder="Contoh: 30" min="1">
+    </div>
+    <div style="text-align:center;color:var(--muted);font-size:12px;margin:-8px 0 12px">— atau —</div>
+    <div class="form-group">
+      <label class="form-label">Tanggal Spesifik</label>
+      <input type="date" class="form-input" id="expiryDate">
+    </div>
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--muted)">
+        <input type="checkbox" id="expiryUnlimited" style="width:16px;height:16px">
+        Hapus expiry (akses unlimited)
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('expiryModal').classList.add('hidden')">Batal</button>
+      <button class="btn btn-primary btn-sm" onclick="confirmExpiry()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/utils.js"></script>
+<script>
+  var resetUserId = null;
+  var expiryUserId = null;
+
+  async function init() {
+    try {
+      var me = await api('GET', '/auth/me');
+      if (me.role !== 'admin') return window.location.href = '/user/';
+      document.getElementById('userEmail').textContent = me.email;
+      loadUsers();
+    } catch { window.location.href = '/login.html'; }
+  }
+
+  document.querySelectorAll('.sidebar-nav a').forEach(function(link) {
+    link.addEventListener('click', function(e) {
+      e.preventDefault();
+      var page = link.dataset.page;
+      document.querySelectorAll('.sidebar-nav a').forEach(function(l) { l.classList.remove('active'); });
+      link.classList.add('active');
+      document.querySelectorAll('[id^="page-"]').forEach(function(el) { el.classList.add('hidden'); });
+      document.getElementById('page-' + page).classList.remove('hidden');
+      if (page === 'users') loadUsers();
+      if (page === 'jobs')  loadJobs();
+    });
+  });
+
+  async function loadUsers() {
+    var tbody = document.getElementById('usersTable');
+    try {
+      var users = await api('GET', '/admin/users');
+      tbody.innerHTML = users.map(function(u) {
+        var expiry = '—';
+        if (u.expires_at) {
+          var exp  = new Date(u.expires_at);
+          var diff = Math.ceil((exp - new Date()) / 86400000);
+          expiry = diff < 0
+            ? '<span style="color:var(--danger)">Expired</span>'
+            : diff <= 7
+              ? '<span style="color:var(--warning)">' + diff + ' hari lagi</span>'
+              : exp.toLocaleDateString('id-ID');
+        } else {
+          expiry = '<span style="color:var(--muted)">∞ Unlimited</span>';
+        }
+        return '<tr>' +
+          '<td style="color:var(--muted)">#' + u.id + '</td>' +
+          '<td>' + u.email + '</td>' +
+          '<td>' + (u.role === 'admin' ? '<span class="badge badge-admin">admin</span>' : '<span style="color:var(--muted)">user</span>') + '</td>' +
+          '<td>' + expiry + '</td>' +
+          '<td style="color:var(--muted)">' + fmtDate(u.created_at) + '</td>' +
+          '<td><div class="row-actions">' +
+            '<button class="btn btn-ghost btn-sm" onclick="openExpiry(' + u.id + ',\'' + (u.expires_at||'') + '\')">⏳</button>' +
+            '<button class="btn btn-ghost btn-sm" onclick="openReset(' + u.id + ')">Reset PW</button>' +
+            '<button class="btn btn-danger btn-sm" onclick="deleteUser(' + u.id + ')">Hapus</button>' +
+          '</div></td></tr>';
+      }).join('');
+    } catch {}
+  }
+
+  async function loadJobs() {
+    var tbody = document.getElementById('jobsTable');
+    tbody.innerHTML = '<tr><td colspan="7" style="color:var(--muted)">Loading...</td></tr>';
+    try {
+      var jobs = await api('GET', '/admin/jobs');
+      tbody.innerHTML = jobs.map(function(j) {
+        return '<tr>' +
+          '<td style="color:var(--muted)">#' + j.id + '</td>' +
+          '<td style="font-size:12px">' + j.user_email + '</td>' +
+          '<td>' + (j.original_name || j.title) + '</td>' +
+          '<td style="color:var(--muted)">' + (j.account_name || '—') + '</td>' +
+          '<td>' + badge(j.status) + '</td>' +
+          '<td>' + (j.asset_id ? '<code style="color:var(--neon)">' + j.asset_id + '</code>' : j.error_message ? '<span style="color:var(--danger);font-size:12px">' + j.error_message.substring(0,60) + '</span>' : '—') + '</td>' +
+          '<td style="color:var(--muted)">' + fmtDate(j.created_at) + '</td></tr>';
+      }).join('');
+    } catch {}
+  }
+
+  function openReset(id) {
+    resetUserId = id;
+    document.getElementById('resetPassword').value = '';
+    document.getElementById('resetModal').classList.remove('hidden');
+  }
+
+  async function confirmReset() {
+    var pw = document.getElementById('resetPassword').value;
+    if (!pw) return;
+    try {
+      await api('POST', '/admin/users/' + resetUserId + '/reset-password', { password: pw });
+      showAlert('alert', 'Password direset!', 'success');
+      document.getElementById('resetModal').classList.add('hidden');
+    } catch (err) { showAlert('alert', err.message); }
+  }
+
+  function openExpiry(id, cur) {
+    expiryUserId = id;
+    document.getElementById('expiryDays').value = '';
+    document.getElementById('expiryDate').value = cur ? cur.split('T')[0] : '';
+    document.getElementById('expiryUnlimited').checked = false;
+    document.getElementById('expiryModal').classList.remove('hidden');
+  }
+
+  async function confirmExpiry() {
+    var days      = document.getElementById('expiryDays').value;
+    var date      = document.getElementById('expiryDate').value;
+    var unlimited = document.getElementById('expiryUnlimited').checked;
+    var payload   = unlimited ? {} : days ? { days: parseInt(days) } : date ? { expires_at: date } : null;
+    if (!payload && !unlimited) return showAlert('alert', 'Isi salah satu field');
+    try {
+      var data = await api('POST', '/admin/users/' + expiryUserId + '/set-expiry', payload || {});
+      showAlert('alert', data.expires_at ? 'Expiry diset ke ' + new Date(data.expires_at).toLocaleDateString('id-ID') : 'Expiry dihapus', 'success');
+      document.getElementById('expiryModal').classList.add('hidden');
+      loadUsers();
+    } catch (err) { showAlert('alert', err.message); }
+  }
+
+  async function deleteUser(id) {
+    if (!confirm('Hapus user ini dan semua datanya?')) return;
+    try { await api('DELETE', '/admin/users/' + id); showAlert('alert', 'User dihapus', 'success'); loadUsers(); }
+    catch (err) { showAlert('alert', err.message); }
+  }
+
+  async function resetStuckJobs() {
+    if (!confirm('Reset semua job yang stuck di processing?')) return;
+    var data = await api('POST', '/admin/reset-jobs');
+    showAlert('alert', data.waiting_count + ' job direset', 'success');
+    loadJobs();
+  }
+
+  async function deleteAllJobs() {
+    if (!confirm('HAPUS SEMUA JOBS? Ini tidak bisa diundo!')) return;
+    var data = await api('DELETE', '/admin/jobs/all');
+    showAlert('alert', data.deleted + ' jobs dihapus', 'success');
+    loadJobs();
+  }
+
+  document.getElementById('createUserForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    try {
+      var days = document.getElementById('newExpiryDays').value;
+      var date = document.getElementById('newExpiry').value;
+      var expires_at = null;
+      if (days && parseInt(days) > 0) { var d = new Date(); d.setDate(d.getDate() + parseInt(days)); expires_at = d.toISOString(); }
+      else if (date) { expires_at = new Date(date).toISOString(); }
+      await api('POST', '/admin/users', { email: document.getElementById('newEmail').value, password: document.getElementById('newPassword').value, role: document.getElementById('newRole').value, expires_at });
+      showAlert('alert', 'User berhasil dibuat!', 'success');
+      e.target.reset();
+      loadUsers();
+    } catch (err) { showAlert('alert', err.message); }
+  });
+
+  init();
+</script>
+</body>
+</html>
